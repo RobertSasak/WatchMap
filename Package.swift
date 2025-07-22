@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
   name: "WatchMap",
   platforms: [
-    .watchOS(.v11),
+    .watchOS(.v8),
     .iOS(.v15),
   ],
   products: [
