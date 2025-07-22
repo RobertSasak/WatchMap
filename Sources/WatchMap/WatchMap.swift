@@ -78,7 +78,7 @@ public struct MapView<TileContent: View, UserLocationContent: View>: View {
 
     @GestureState private var dragOffset: CGSize = .zero
 
-    init(
+    public init(
         initialCenter: CLLocationCoordinate2D,
         initialZoom: Double,
         minZoom: Double = 1,
