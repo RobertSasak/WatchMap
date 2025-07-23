@@ -62,14 +62,14 @@ public func userLocationMarker(heading: Double?) -> some View {
 }
 
 public struct MapView<TileContent: View, UserLocationContent: View>: View {
-    @State private var zoom: Double = 5
+    @Binding private var zoom: Double
+    @Binding private var center: CLLocationCoordinate2D
+    @Binding private var userLocation: CLLocationCoordinate2D?
+    @Binding private var heading: Double?
     private let minZoom: Double
     private let maxZoom: Double
     private let tileSize: Double
     private let gridSize: Int
-    @State private var centerCoordinate: CLLocationCoordinate2D
-    private let userLocation: CLLocationCoordinate2D?
-    private let heading: Double?
     private var onPan: ((CLLocationCoordinate2D) -> Void)?
     private var onTap: ((CLLocationCoordinate2D) -> Void)?
     private let tileContent: (Int, Int, Int, Double) -> TileContent
@@ -81,12 +81,12 @@ public struct MapView<TileContent: View, UserLocationContent: View>: View {
     @GestureState private var dragOffset: CGSize = .zero
 
     public init(
-        initialCenter: CLLocationCoordinate2D,
-        initialZoom: Double,
+        zoom: Binding<Double>,
+        center: Binding<CLLocationCoordinate2D>,
+        userLocation: Binding<CLLocationCoordinate2D?> = .constant(nil),
+        heading: Binding<Double?> = .constant(nil),
         minZoom: Double = 1,
         maxZoom: Double = 20,
-        userLocation: CLLocationCoordinate2D? = nil,
-        heading: Double? = nil,
         tileSize: Double = 256,
         gridSize: Int = 2,
         onPan: ((CLLocationCoordinate2D) -> Void)? = nil,
@@ -96,10 +96,12 @@ public struct MapView<TileContent: View, UserLocationContent: View>: View {
         @ViewBuilder userLocationContent: @escaping (Double?) -> UserLocationContent =
             userLocationMarker
     ) {
+        self._zoom = zoom
+        self._center = center
+        self._userLocation = userLocation
+        self._heading = heading
         self.minZoom = minZoom
         self.maxZoom = maxZoom
-        self.userLocation = userLocation
-        self.heading = heading
         self.tileSize = tileSize
         self.gridSize = gridSize
         self.onPan = onPan
@@ -107,8 +109,6 @@ public struct MapView<TileContent: View, UserLocationContent: View>: View {
         self.tapDistance = tapDistance
         self.tileContent = tileContent
         self.userLocationContent = userLocationContent
-        _zoom = .init(wrappedValue: initialZoom)
-        _centerCoordinate = .init(wrappedValue: initialCenter)
         halfSpan = (Double(gridSize) - 1) / 2.0
         range = Array(stride(from: -halfSpan, through: halfSpan, by: 1.0))
     }
@@ -121,7 +121,7 @@ public struct MapView<TileContent: View, UserLocationContent: View>: View {
         let dragX = dragOffset.width / scale
         let dragY = dragOffset.height / scale
 
-        let (centerX, centerY) = tileXY(for: centerCoordinate, zoom: zoomInt)
+        let (centerX, centerY) = tileXY(for: center, zoom: zoomInt)
 
         let fracX = centerX.truncatingRemainder(dividingBy: 1)
         let fracY = centerY.truncatingRemainder(dividingBy: 1)
@@ -192,7 +192,7 @@ public struct MapView<TileContent: View, UserLocationContent: View>: View {
                                     let newCenterY = centerY - deltaY
                                     let newCenter = coordinate(
                                         forX: newCenterX, y: newCenterY, zoom: zoomInt)
-                                    self.centerCoordinate = newCenter
+                                    self.center = newCenter
                                     onPan?(newCenter)
                                 }
                             }
@@ -212,121 +212,173 @@ public struct MapView<TileContent: View, UserLocationContent: View>: View {
 let oslo = CLLocationCoordinate2D(latitude: 59.9111, longitude: 10.7528)
 
 #Preview {
-    MapView(
-        initialCenter: oslo,
-        initialZoom: 12,
-        minZoom: 1,
-        maxZoom: 18,
-        userLocation: oslo,
-        heading: 125,
-    )
+    struct Preview: View {
+        @State private var zoom: Double = 12
+        @State private var center: CLLocationCoordinate2D = oslo
+        @State private var userLocation: CLLocationCoordinate2D? = oslo
+        @State private var heading: Double? = 125
+        var body: some View {
+            MapView(
+                zoom: $zoom,
+                center: $center,
+                userLocation: $userLocation,
+                heading: $heading,
+                minZoom: 1,
+                maxZoom: 18
+            )
+        }
+    }
+    return Preview()
 }
 
 #Preview("with userLocation") {
-    MapView(
-        initialCenter: oslo,
-        initialZoom: 6,
-        userLocation: oslo
-    )
+    struct Preview: View {
+        @State private var zoom: Double = 6
+        @State private var center: CLLocationCoordinate2D = oslo
+        @State private var userLocation: CLLocationCoordinate2D? = oslo
+        var body: some View {
+            MapView(
+                zoom: $zoom,
+                center: $center,
+                userLocation: $userLocation
+            )
+        }
+    }
+    return Preview()
 }
 
 #Preview("with gridSize=3") {
-    MapView(
-        initialCenter: oslo,
-        initialZoom: 10,
-        userLocation: oslo,
-        tileSize: 64,
-        gridSize: 3
-    )
+    struct Preview: View {
+        @State private var zoom: Double = 10
+        @State private var center: CLLocationCoordinate2D = oslo
+        @State private var userLocation: CLLocationCoordinate2D? = oslo
+        var body: some View {
+            MapView(
+                zoom: $zoom,
+                center: $center,
+                userLocation: $userLocation,
+                tileSize: 64,
+                gridSize: 3
+            )
+        }
+    }
+    return Preview()
 }
 
 #Preview("with custom marker") {
-    MapView(
-        initialCenter: oslo,
-        initialZoom: 16,
-        userLocation: oslo,
-        userLocationContent: { heading in
-            if heading == nil {
-                Circle()
-                    .fill(Color.red)
-                    .frame(width: 20, height: 20)
-            } else {
-                Image(systemName: "location.fill")
-                    .font(.title3)
-                    .padding(5)
-                    .foregroundColor(.red)
-                    .rotationEffect(.degrees(heading ?? 0))
-            }
+    struct Preview: View {
+        @State private var zoom: Double = 16
+        @State private var center: CLLocationCoordinate2D = oslo
+        @State private var userLocation: CLLocationCoordinate2D? = oslo
+        @State private var heading: Double? = 125
+        var body: some View {
+            MapView(
+                zoom: $zoom,
+                center: $center,
+                userLocation: $userLocation,
+                heading: $heading,
+                userLocationContent: { heading in
+                    if heading == nil {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 20, height: 20)
+                    } else {
+                        Image(systemName: "location.fill")
+                            .font(.title3)
+                            .padding(5)
+                            .foregroundColor(.red)
+                            .rotationEffect(.degrees(heading ?? 0))
+                    }
+                }
+            )
         }
-    )
+    }
+    return Preview()
 }
 
 #Preview("with debug tiles") {
-    MapView(
-        initialCenter: oslo,
-        initialZoom: 6,
-        userLocation: oslo,
-        tileSize: 64,
-        tileContent: { z, x, y, tileSize in
-            osmTile(z: z, x: x, y: y, tileSize: tileSize)
-                .border(.red)
-                .overlay(
-                    VStack {
-                        Text("z:\(z)")
-                        Text("x:\(x)")
-                        Text("y:\(y)")
-                    }
-                    .font(.system(size: 10))
-                    .foregroundColor(.red)
-                    .padding(2)
-                    .background(Color.white.opacity(0.7))
-                    .cornerRadius(4)
-                    .padding(2)
-                )
-
+    struct Preview: View {
+        @State private var zoom: Double = 6
+        @State private var center: CLLocationCoordinate2D = oslo
+        @State private var userLocation: CLLocationCoordinate2D? = oslo
+        var body: some View {
+            MapView(
+                zoom: $zoom,
+                center: $center,
+                userLocation: $userLocation,
+                tileSize: 64,
+                tileContent: { z, x, y, tileSize in
+                    osmTile(z: z, x: x, y: y, tileSize: tileSize)
+                        .border(.red)
+                        .overlay(
+                            VStack {
+                                Text("z:\(z)")
+                                Text("x:\(x)")
+                                Text("y:\(y)")
+                            }
+                            .font(.system(size: 10))
+                            .foregroundColor(.red)
+                            .padding(2)
+                            .background(Color.white.opacity(0.7))
+                            .cornerRadius(4)
+                            .padding(2)
+                        )
+                }
+            )
         }
-    )
+    }
+    return Preview()
 }
 
 #Preview("with location button") {
-    ZStack {
-        MapView(
-            initialCenter: oslo,
-            initialZoom: 3,
-            userLocation: oslo,
-        )
-        VStack {
-            Spacer()
-            HStack {
-                Button(action: {
-                    print("Location button pressed")
-                }) {
-                    Image(systemName: "location.fill")
-                        .font(.title3)
-                        .padding(5)
-                        .background(.white.opacity(0.8))
-                        .foregroundColor(.red)
-                        .clipShape(Circle())
-                        .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 4)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Location button")
-                .fixedSize(horizontal: true, vertical: true)
-                Spacer()
+    struct Preview: View {
+        @State private var zoom: Double = 3
+        @State private var center: CLLocationCoordinate2D = oslo
+        @State private var userLocation: CLLocationCoordinate2D? = oslo
+        var body: some View {
+            ZStack {
+                MapView(
+                    zoom: $zoom,
+                    center: $center,
+                    userLocation: $userLocation
+                )
+                VStack {
+                    Spacer()
+                    HStack {
+                        Button(action: {
+                            print("Location button pressed")
+                            self.center = oslo
+                        }) {
+                            Image(systemName: "location.fill")
+                                .font(.title3)
+                                .padding(5)
+                                .background(.white.opacity(0.8))
+                                .foregroundColor(.red)
+                                .clipShape(Circle())
+                                .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 4)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Location button")
+                        .fixedSize(horizontal: true, vertical: true)
+                        Spacer()
+                    }
+                }.padding(.horizontal, 10)
             }
         }
-        .padding(.horizontal, 10)
     }
+    return Preview()
 }
 
 #Preview("with tap callback") {
-    struct TapDemo: View {
+    struct Preview: View {
         @State private var alert: Bool = false
         @State private var tappedCoordinate: CLLocationCoordinate2D? = nil
+        @State private var zoom: Double = 6
+        @State private var center: CLLocationCoordinate2D = oslo
         var body: some View {
             MapView(
-                initialCenter: oslo,
-                initialZoom: 6,
+                zoom: $zoom,
+                center: $center,
                 onTap: { coord in
                     tappedCoordinate = coord
                     alert = true
@@ -341,5 +393,31 @@ let oslo = CLLocationCoordinate2D(latitude: 59.9111, longitude: 10.7528)
             }
         }
     }
-    return TapDemo()
+    return Preview()
+}
+
+#Preview("with persistence") {
+    struct Preview: View {
+        @AppStorage("preview_zoom") private var zoom: Double = 12
+        @AppStorage("preview_center_latitude") private var centerLatitude: Double = oslo.latitude
+        @AppStorage("preview_center_longitude") private var centerLongitude: Double = oslo.longitude
+
+        var centerBinding: Binding<CLLocationCoordinate2D> {
+            Binding(
+                get: { CLLocationCoordinate2D(latitude: centerLatitude, longitude: centerLongitude) },
+                set: {
+                    centerLatitude = $0.latitude
+                    centerLongitude = $0.longitude
+                }
+            )
+        }
+
+        var body: some View {
+            MapView(
+                zoom: $zoom,
+                center: centerBinding,
+            )
+        }
+    }
+    return Preview()
 }
