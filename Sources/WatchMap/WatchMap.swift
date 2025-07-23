@@ -132,77 +132,80 @@ public struct MapView<TileContent: View, UserLocationContent: View>: View {
         let offsetX = shiftX * tileSize
         let offsetY = shiftY * tileSize
 
-        ZStack {
-            Rectangle()
-                .opacity(0)
-                .background(
-                    ZStack {
-                        VStack(spacing: 0) {
-                            ForEach(range, id: \.self) { dy in
-                                HStack(spacing: 0) {
-                                    ForEach(range, id: \.self) { dx in
-                                        let x = Int(floor(centerX + dx))
-                                        let y = Int(floor(centerY + dy))
-                                        tileContent(zoomInt, x, y, tileSize)
+        GeometryReader { geo in
+            ZStack {
+                Rectangle()
+                    .opacity(0)
+                    .background(
+                        ZStack {
+                            VStack(spacing: 0) {
+                                ForEach(range, id: \.self) { dy in
+                                    HStack(spacing: 0) {
+                                        ForEach(range, id: \.self) { dx in
+                                            let x = Int(floor(centerX + dx))
+                                            let y = Int(floor(centerY + dy))
+                                            tileContent(zoomInt, x, y, tileSize)
+                                        }
                                     }
                                 }
                             }
-                        }
-                        .offset(x: offsetX, y: offsetY)
-
-                        if let userLocation = userLocation {
-                            let (userX, userY) = tileXY(for: userLocation, zoom: zoomInt)
-                            userLocationContent(heading)
-                                .scaleEffect(1 / scale)
-                                .offset(
-                                    x: (userX - centerX) * tileSize,
-                                    y: (userY - centerY) * tileSize
-                                )
-                        }
-                    }
-                    .offset(x: dragX, y: dragY)
-                    .scaleEffect(scale, anchor: .center)
-                )
-                .frame(width: tileSize * Double(gridSize), height: tileSize * Double(gridSize))
-                .gesture(
-                    DragGesture(minimumDistance: 0, coordinateSpace: .local)
-                        .updating($dragOffset) { value, state, _ in
-                            state = value.translation
-                        }
-                        .onEnded { value in
-                            let isTap = abs(value.translation.width) < tapDistance && abs(value.translation.height) < tapDistance
-                            if isTap, let onTap = onTap {
-                                let tapLocation = value.location
-                                let mapWidth = tileSize * Double(gridSize)
-                                let mapHeight = tileSize * Double(gridSize)
-                                let dx = (tapLocation.x - mapWidth / 2) / scale
-                                let dy = (tapLocation.y - mapHeight / 2) / scale
-                                let tileDx = dx / tileSize
-                                let tileDy = dy / tileSize
-                                let tapTileX = centerX + tileDx
-                                let tapTileY = centerY + tileDy
-                                let coord = coordinate(forX: tapTileX, y: tapTileY, zoom: zoomInt)
-                                onTap(coord)
-                            } else {
-                                let scale = pow(2.0, zoom - floor(zoom))
-                                let deltaX = value.translation.width / (tileSize * scale)
-                                let deltaY = value.translation.height / (tileSize * scale)
-                                let newCenterX = centerX - deltaX
-                                let newCenterY = centerY - deltaY
-                                let newCenter = coordinate(
-                                    forX: newCenterX, y: newCenterY, zoom: zoomInt)
-                                self.centerCoordinate = newCenter
-                                onPan?(newCenter)
+                            .offset(x: offsetX, y: offsetY)
+                            
+                            if let userLocation = userLocation {
+                                let (userX, userY) = tileXY(for: userLocation, zoom: zoomInt)
+                                userLocationContent(heading)
+                                    .scaleEffect(1 / scale)
+                                    .offset(
+                                        x: (userX - centerX) * tileSize,
+                                        y: (userY - centerY) * tileSize
+                                    )
                             }
                         }
-                )
-                #if os(watchOS)
+                            .offset(x: dragX, y: dragY)
+                            .scaleEffect(scale, anchor: .center)
+                    )
+                    .frame(width: tileSize * Double(gridSize), height: tileSize * Double(gridSize))
+                    .gesture(
+                        DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                            .updating($dragOffset) { value, state, _ in
+                                state = value.translation
+                            }
+                            .onEnded { value in
+                                let isTap = abs(value.translation.width) < tapDistance && abs(value.translation.height) < tapDistance
+                                if isTap, let onTap = onTap {
+                                    let tapLocation = value.location
+                                    let mapWidth = tileSize * Double(gridSize)
+                                    let mapHeight = tileSize * Double(gridSize)
+                                    let dx = (tapLocation.x - mapWidth / 2) / scale
+                                    let dy = (tapLocation.y - mapHeight / 2) / scale
+                                    let tileDx = dx / tileSize
+                                    let tileDy = dy / tileSize
+                                    let tapTileX = centerX + tileDx
+                                    let tapTileY = centerY + tileDy
+                                    let coord = coordinate(forX: tapTileX, y: tapTileY, zoom: zoomInt)
+                                    onTap(coord)
+                                } else {
+                                    let scale = pow(2.0, zoom - floor(zoom))
+                                    let deltaX = value.translation.width / (tileSize * scale)
+                                    let deltaY = value.translation.height / (tileSize * scale)
+                                    let newCenterX = centerX - deltaX
+                                    let newCenterY = centerY - deltaY
+                                    let newCenter = coordinate(
+                                        forX: newCenterX, y: newCenterY, zoom: zoomInt)
+                                    self.centerCoordinate = newCenter
+                                    onPan?(newCenter)
+                                }
+                            }
+                    )
+#if os(watchOS)
                     .focusable()
                     .digitalCrownRotation(
                         $zoom, from: minZoom, through: maxZoom, by: 0.1, sensitivity: .medium,
                         isContinuous: false, isHapticFeedbackEnabled: true)
-                #endif
-        }
+#endif
+            }
+            .frame(maxWidth: geo.size.width, maxHeight: geo.size.height)
+        }.ignoresSafeArea()
     }
 }
 
@@ -312,6 +315,7 @@ let oslo = CLLocationCoordinate2D(latitude: 59.9111, longitude: 10.7528)
                 Spacer()
             }
         }
+        .padding(.horizontal, 10)
     }
 }
 
