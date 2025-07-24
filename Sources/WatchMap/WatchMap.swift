@@ -72,13 +72,16 @@ public struct MapView<TileContent: View, UserLocationContent: View>: View {
     private let gridSize: Int
     private var onPan: ((CLLocationCoordinate2D) -> Void)?
     private var onTap: ((CLLocationCoordinate2D) -> Void)?
+    private let tapDistance: Double
+    private let tapDuration: Double
     private let tileContent: (Int, Int, Int, Double) -> TileContent
     private let userLocationContent: (Double?) -> UserLocationContent
     private let halfSpan: Double
     private let range: [Double]
-    private let tapDistance: CGFloat
+    
 
     @GestureState private var dragOffset: CGSize = .zero
+    @State private var gestureStartTime: Date? = nil
 
     public init(
         zoom: Binding<Double>,
@@ -91,7 +94,8 @@ public struct MapView<TileContent: View, UserLocationContent: View>: View {
         gridSize: Int = 2,
         onPan: ((CLLocationCoordinate2D) -> Void)? = nil,
         onTap: ((CLLocationCoordinate2D) -> Void)? = nil,
-        tapDistance: CGFloat = 5,
+        tapDistance: Double = 5,
+        tapDuration: Double = 500,
         @ViewBuilder tileContent: @escaping (Int, Int, Int, Double) -> TileContent = osmTile,
         @ViewBuilder userLocationContent: @escaping (Double?) -> UserLocationContent =
             userLocationMarker
@@ -107,6 +111,7 @@ public struct MapView<TileContent: View, UserLocationContent: View>: View {
         self.onPan = onPan
         self.onTap = onTap
         self.tapDistance = tapDistance
+        self.tapDuration = tapDuration
         self.tileContent = tileContent
         self.userLocationContent = userLocationContent
         halfSpan = (Double(gridSize) - 1) / 2.0
@@ -167,11 +172,19 @@ public struct MapView<TileContent: View, UserLocationContent: View>: View {
                     .frame(width: tileSize * Double(gridSize), height: tileSize * Double(gridSize))
                     .gesture(
                         DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                            .onChanged { value in
+                                if gestureStartTime == nil {
+                                    gestureStartTime = Date()
+                                }
+                            }
                             .updating($dragOffset) { value, state, _ in
                                 state = value.translation
                             }
                             .onEnded { value in
-                                let isTap = abs(value.translation.width) < tapDistance && abs(value.translation.height) < tapDistance
+                                let endTime = Date()
+                                let duration = gestureStartTime.map { endTime.timeIntervalSince($0) * 1000 } ?? 0 // ms
+                                gestureStartTime = nil
+                                let isTap = abs(value.translation.width) < tapDistance && abs(value.translation.height) < tapDistance && duration > tapDuration
                                 if isTap, let onTap = onTap {
                                     let tapLocation = value.location
                                     let mapWidth = tileSize * Double(gridSize)
